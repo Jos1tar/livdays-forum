@@ -40,7 +40,8 @@ public class MessageServiceImpl implements MessageService {
     @Transactional
     public Result sendMessage(Long senderId, MessageDTO messageDTO) {
         // check parameters
-        if (senderId == null || messageDTO.getReceiverId() == null || messageDTO.getContent() == null) {
+        if (senderId == null || messageDTO.getReceiverId() == null
+                || messageDTO.getContent() == null || messageDTO.getContent().isBlank()) {
             return Result.error(AppHttpCodeEnum.PARAMETER_ERROR);
         }
 
@@ -82,6 +83,7 @@ public class MessageServiceImpl implements MessageService {
                 conversation.setUnreadCountUser1(conversation.getUnreadCountUser1() + 1);
             }
             conversation.setUpdateTime(LocalDateTime.now());
+            conversation.setIsDeleted(0); // revive a previously deleted conversation
             conversationMapper.update(conversation);
         }
 

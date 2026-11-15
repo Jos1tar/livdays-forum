@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
-import static ac.liverpool.forum.enums.AppHttpCodeEnum.SYSTEM_ERROR;
+import static ac.liverpool.forum.enums.AppHttpCodeEnum.PARAMETER_ERROR;
 
 @Slf4j
 @RestController
@@ -46,16 +46,19 @@ public class UploadController {
     @PostMapping("/upload")
     public Result upload(MultipartFile file) throws Exception {
         log.info("uploading file: {}", file);
-        if (!file.isEmpty()) {
-            // generate unique file name here
-            String originalFilename = file.getOriginalFilename();
-            String extName = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String uniqueFileName = UUID.randomUUID().toString().replace("-", "") + extName;
-            // uplkoad
-            String url = aliyunOSSOperator.upload(file.getBytes(), uniqueFileName);
-            return Result.success(url);
+        if (file == null || file.isEmpty()) {
+            return Result.error(PARAMETER_ERROR, "File is empty");
         }
-        return Result.error(SYSTEM_ERROR);
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            return Result.error(PARAMETER_ERROR, "File must have an extension");
+        }
+        // generate unique file name here
+        String extName = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String uniqueFileName = UUID.randomUUID().toString().replace("-", "") + extName;
+        // upload
+        String url = aliyunOSSOperator.upload(file.getBytes(), uniqueFileName);
+        return Result.success(url);
     }
 
 }

@@ -13,11 +13,11 @@ export const useCommentApi = () => {
 
   
   // 查询子评论
+  // 后端是路径参数 /comment/childComments/{parentId}（之前用 query 参数会 404）
   const getChildComments = (parentId) => {
     return request({
-      url: '/comment/childComments',
-      method: 'get',
-      params: { parentId }
+      url: `/comment/childComments/${parentId}`,
+      method: 'get'
     })
   }
   

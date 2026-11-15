@@ -4,12 +4,18 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 // 创建axios实例
+// 后端地址来自 .env.development / .env.production 里的 VITE_API_BASE_URL
+// 以前用过的地址：http://43.165.3.68:8080/ 、 http://118.25.14.2:8080/
 const service = axios.create({
-  // baseURL: 'http://43.165.3.68:8080/',
-  baseURL: 'http://118.25.14.2:8080/',
-  // baseURL: 'http://localhost:8080/',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/',
   timeout: 120000
 })
+
+const goLogin = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
+  router.replace('/')   // 登录页的路由是 '/'（之前写成了不存在的 '/login'）
+}
 
 // 请求拦截器
 service.interceptors.request.use(
@@ -18,10 +24,8 @@ service.interceptors.request.use(
     const token = localStorage.getItem('token')
 
 
-    if (token !== null) {
-      config.headers['authorization'] = `Bearer ${token}`;
-      config.authorization = `Bearer ${token}`;
-      // config.headers['ngrok-skip-browser-warning'] = "69420"
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
 
     return config
@@ -36,16 +40,14 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data
-    console.log('123',res)
-    
+
     // 根据业务状态码处理响应
-    if (res.code && res.code !== 200) {
+    if (res && res.code && res.code !== 200) {
       // 处理各种错误状态
       switch (res.code) {
         case 401:
           ElMessage.error('登录已过期，请重新登录')
-          localStorage.removeItem('token')
-          router.replace('/login')
+          goLogin()
           break
         case 403:
           ElMessage.error('没有权限访问')
@@ -69,8 +71,7 @@ service.interceptors.response.use(
       switch (status) {
         case 401:
           ElMessage.error('登录已过期，请重新登录')
-          localStorage.removeItem('token')
-          router.replace('/login')
+          goLogin()
           break
         case 404:
           ElMessage.error('请求的资源不存在')
@@ -81,7 +82,7 @@ service.interceptors.response.use(
         default:
           ElMessage.error(`请求失败: ${status}`)
       }
-    } else if (error.message.includes('timeout')) {
+    } else if (error.message && error.message.includes('timeout')) {
       ElMessage.error('请求超时，请稍后再试')
     } else {
       ElMessage.error('网络错误，请检查网络连接')

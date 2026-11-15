@@ -1,41 +1,56 @@
 package ac.liverpool.forum.util;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 
-import io.jsonwebtoken.security.Keys; // 注意要加这个import
-import javax.crypto.SecretKey;          // 还有这个
-
+/**
+ * JWT helper. The signing key is read from the "jwt.secret" property
+ * (environment variable JWT_SECRET, see application.yml).
+ */
+@Slf4j
+@Component
 public class JwtUtils {
 
-    private static final String SIGN_KEY_STRING = "b1c3e5g7i9k1m3o5q7s9u1w3y5a7c9eb1c3e5g7i9k1m3o5q7s9u1w3y5a7c9e";
-    private static final SecretKey SIGN_KEY = Keys.hmacShaKeyFor(SIGN_KEY_STRING.getBytes());
-    private static final long EXPIRE_TIME = 12 * 60 * 60 * 1000L; // 12hours
+    private static final long EXPIRE_TIME = 12 * 60 * 60 * 1000L; // 12 hours
+    private static volatile SecretKey signKey;
+
+    @Value("${jwt.secret}")
+    public void setSecret(String secret) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("jwt.secret (JWT_SECRET) must be at least 32 bytes long");
+        }
+        signKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public static String generateJwt(Long userId, Map<String, Object> claims) {
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
                 .addClaims(claims)
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRE_TIME))
-                .signWith(SIGN_KEY, SignatureAlgorithm.HS256)
+                .signWith(signKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public static Claims parseJWT(String jwt) {
         try {
             return Jwts.parserBuilder()
-                    .setSigningKey(SIGN_KEY)
+                    .setSigningKey(signKey)
                     .build()
                     .parseClaimsJws(jwt)
                     .getBody();
         } catch (ExpiredJwtException e) {
-            System.out.println("Token expired: " + e.getMessage());
-        } catch (SignatureException e) {
-            System.out.println("Token signature error: " + e.getMessage());
-        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-            System.out.println("Token format error: " + e.getMessage());
+            log.info("Token expired: {}", e.getMessage());
+        } catch (JwtException | IllegalArgumentException e) {
+            // bad signature, malformed or unsupported token
+            log.info("Invalid token: {}", e.getMessage());
         }
         return null;
     }

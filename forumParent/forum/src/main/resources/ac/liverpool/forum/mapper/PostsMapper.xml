@@ -9,7 +9,7 @@
         FROM posts p
         JOIN users u ON p.user_id = u.id
         <where>
-            p.is_deleted = false
+            p.is_deleted = 0
             <if test="keyword != null and keyword != ''">
                 AND p.title LIKE CONCAT('%', #{keyword}, '%')
             </if>

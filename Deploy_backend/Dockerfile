@@ -1,31 +1,24 @@
+# Build the jar first (in forumParent/forum):  mvn clean package -DskipTests
+# then copy forumParent/forum/target/forum-0.0.1-SNAPSHOT.jar next to this Dockerfile and run:
+#   docker build -t livdays-backend .
+#   docker run -d -p 8080:8080 \
+#     -e DB_URL="jdbc:mysql://<host>:3306/LivDayDB?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false" \
+#     -e DB_USERNAME=root -e DB_PASSWORD=... \
+#     -e MAIL_USERNAME=... -e MAIL_PASSWORD=... \
+#     -e JWT_SECRET=<at least 32 random characters> \
+#     -e OSS_ACCESS_KEY_ID=... -e OSS_ACCESS_KEY_SECRET=... \
+#     livdays-backend
+#
+# (The old version was based on centos:7, which is end-of-life, and extracted a JDK
+#  tarball whose name did not match the copied file, so the image could not be built.)
+FROM eclipse-temurin:17-jre
 
-FROM centos:7
+ENV LANG=C.UTF-8 \
+    TZ=UTC
 
-
-COPY jdk17.tar.gz /usr/local/
-RUN tar -xzf /usr/local/jdk-17.0.12_linux-x64_bin.tar -C /usr/local/ &&  rm /usr/local/jdk-17.0.12_linux-x64_bin.tar
-
-
-ENV JAVA_HOME=/usr/local/jdk-17.0.12
-ENV PATH=$JAVA_HOME/bin:$PATH
-
-#ENV your oss key
-#ENV your oss key
-
-
-ENV LANG=en_US.UTF-8
-ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.UTF-8
-
-
-RUN mkdir -p /forum
 WORKDIR /forum
-
-
-COPY  forumParent-0.0.1-SNAPSHOT.jar  forumParent-0.0.1-SNAPSHOT.jar
-
+COPY forum-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8080
 
-
-ENTRYPOINT ["java","-jar","/forum/forumParent-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "/forum/app.jar"]

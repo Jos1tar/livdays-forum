@@ -5,6 +5,8 @@ import ac.liverpool.forum.entity.dto.PostQueryParam;
 import ac.liverpool.forum.entity.*;
 import ac.liverpool.forum.entity.VO.PageResult;
 import ac.liverpool.forum.entity.VO.PostsVo;
+import ac.liverpool.forum.enums.AppHttpCodeEnum;
+import ac.liverpool.forum.exception.BusinessException;
 import ac.liverpool.forum.mapper.PostsMapper;
 import ac.liverpool.forum.mapper.UsersMapper;
 import ac.liverpool.forum.service.PostsService;
@@ -52,19 +54,32 @@ public class PostsServiceImpl implements PostsService {
         return new PageResult(p.getTotal(), postsVoList);
     }
 
-    // Query post details based on post ID
+    // Query post details based on post ID (also counts one view and loads the images)
     @Override
     public Posts getPostById(Long id) {
-        return postsMapper.getPostById(id);
+        Posts post = postsMapper.getPostById(id);
+        if (post == null) {
+            throw new BusinessException(AppHttpCodeEnum.NO_POSTS, "Post not found");
+        }
+        postsMapper.incrementViews(id);
+        post.setViews((post.getViews() == null ? 0 : post.getViews()) + 1);
+        post.setImageUrls(postsMapper.getPostImages(id));
+        return post;
     }
 
     // Create a post
     @Override
     public Posts createPost(PostCreateRequest request) {
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new BusinessException("Post content cannot be empty");
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new BusinessException("Post title cannot be empty");
+        }
         // 1. Check if the user exists
         String username = usersMapper.getUsernameById(request.getUserId());
         if (username == null) {
-            throw new RuntimeException("user not found");
+            throw new BusinessException(AppHttpCodeEnum.USER_NOT_EXIST, "User not found");
         }
 
         // 2. create a post

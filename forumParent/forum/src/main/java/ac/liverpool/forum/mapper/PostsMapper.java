@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -22,8 +23,21 @@ public interface PostsMapper {
     @Select("SELECT p.*, u.username\n" +
             "FROM posts p\n" +
             "JOIN users u ON p.user_id = u.id\n" +
-            "WHERE p.id = #{id}")
+            "WHERE p.id = #{id} AND p.is_deleted = 0")
     Posts getPostById(Long id);
+
+    // image urls of one post, in upload order
+    @Select("SELECT image_url FROM post_images WHERE post_id = #{postId} ORDER BY sort_order, id")
+    List<String> getPostImages(Long postId);
+
+    @Update("UPDATE posts SET views = IFNULL(views, 0) + 1 WHERE id = #{id}")
+    int incrementViews(Long id);
+
+    @Update("UPDATE posts SET comments = IFNULL(comments, 0) + 1 WHERE id = #{id}")
+    int incrementComments(Long id);
+
+    @Update("UPDATE posts SET likes = #{likes} WHERE id = #{id}")
+    int updateLikes(@Param("id") Long id, @Param("likes") int likes);
 
     // Insert post (return self added ID)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -32,21 +46,4 @@ public interface PostsMapper {
     // Batch insertion of images
     int insertPostImages(@Param("postId") Long postId,
                          @Param("imageUrls") List<String> imageUrls);
-
-
-
-   /* List<Long> getUserInteractedPostIds(@Param("userId") Long userId);
-    *//**
-     * 获取与用户相关的帖子互动信息
-     * @param userId 用户ID
-     * @return 帖子ID和互动用户列表的映射
-     *//*
-    List<Map<String, Object>> getPostInteractions(Long userId);
-
-    *//**
-     * 根据帖子ID列表批量查询帖子
-     * @param postIds 帖子ID列表
-     * @return 帖子列表
-     *//*
-    List<Post> getPostsByIds(@Param("postIds") List<Long> postIds);*/
 }

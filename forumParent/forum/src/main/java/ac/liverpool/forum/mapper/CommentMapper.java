@@ -20,4 +20,8 @@ public interface CommentMapper {
     List<Comments> listByParentId(@Param("parentId") Long parentId);
 
     void addComment(Comments comment);
+
+    Comments getById(@Param("id") Long id);
+
+    int updateLikes(@Param("id") Long id, @Param("likes") int likes);
 }

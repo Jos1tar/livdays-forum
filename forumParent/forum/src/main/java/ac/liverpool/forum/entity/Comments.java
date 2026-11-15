@@ -38,7 +38,9 @@ public class Comments  {
 
     private Integer isDeleted;
 
-    
+    // author username, filled by a JOIN in the list queries (not a column of the comments table)
+    private String username;
+
 
 }
 

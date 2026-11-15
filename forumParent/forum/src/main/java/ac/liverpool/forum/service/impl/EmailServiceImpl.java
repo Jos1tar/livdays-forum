@@ -1,17 +1,20 @@
 package ac.liverpool.forum.service.impl;
 
 import ac.liverpool.forum.service.EmailService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 public class EmailServiceImpl implements EmailService {
-    
+
     private final JavaMailSender mailSender;
-    
-    @Value("${spring.mail.username}")
+
+    @Value("${spring.mail.username:}")
     private String fromEmail;
 
     public EmailServiceImpl(JavaMailSender mailSender) {
@@ -20,11 +23,16 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendVerificationCode(String to, String code) {
+        if (!StringUtils.hasText(fromEmail)) {
+            // Mail is not configured (MAIL_USERNAME empty): local development mode
+            log.warn("MAIL_USERNAME is not set, email not sent. Verification code for {} is: {}", to, code);
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject("University of Liverpool Forum Registration Verification Code");
-        message.setText("Your verification code is : " + code + "\nThe verification code is valid for 20 minutes.");
+        message.setText("Your verification code is : " + code + "\nThe verification code is valid for 5 minutes.");
         mailSender.send(message);
     }
-} 
+}

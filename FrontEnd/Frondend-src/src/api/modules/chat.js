@@ -23,18 +23,33 @@ export const chatApi = () => {
     //    userId: '',
     // targetUserId:""
     //}
+  // 当前用户由后端从 token 里取，只需要传分页参数
   const messageList = (params) => {
     return request({
-      url: `message/list/${params.targetUserId}`,
+      url: `/message/list/${params.targetUserId}`,
       method: 'get',
-      params
+      params: { page: params.page, pageSize: params.pageSize }
     })
   }
-  
- 
-  
+
+  // 会话列表
+  const conversations = () => request({ url: '/message/conversations', method: 'get' })
+
+  // 未读消息总数
+  const unreadCount = () => request({ url: '/message/unread', method: 'get' })
+
+  // 标记某个会话已读
+  const markAsRead = (conversationId) => request({ url: `/message/read/${conversationId}`, method: 'put' })
+
+  // 删除会话
+  const deleteConversation = (conversationId) => request({ url: `/message/${conversationId}`, method: 'delete' })
+
   return {
     sendMessage,
     messageList,
+    conversations,
+    unreadCount,
+    markAsRead,
+    deleteConversation,
   }
 }

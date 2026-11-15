@@ -1,48 +1,48 @@
-#Configure database connection information
+#Every secret below can be supplied through an environment variable.
+#The value after ":" is the local-development default used when the variable is not set.
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: yours
-    username: root
-    password: yours
+    url: ${DB_URL:jdbc:mysql://localhost:3306/LivDayDB?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
 
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
-#Configure the server port. Change it yours.
+
+  #163 mailbox used to send registration codes. MAIL_PASSWORD is the SMTP "authorization code", not the login password.
+  #If MAIL_USERNAME is empty, the code is printed to the backend console instead of being emailed (handy for local dev).
   mail:
     host: smtp.163.com
     port: 465
-    username: yours
-    password: yours
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
           ssl:
             enable: true
-#Configure mybatis' log output to the console
+
+#MyBatis: log SQL to console and map snake_case columns to camelCase fields
 mybatis:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-    #Configure the mapping switch for camel hump naming in mybatis
     map-underscore-to-camel-case: true
 
-mybatis-plus:
-  configuration:
-    #Configure the log output to the console
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-  global-config:
-    db-config:
-      logic-delete-field: delFlag
-      logic-delete-value: 1
-      logic-not-delete-value: 0
-      id-type: auto
+#JWT signing key, must be at least 32 characters. Override JWT_SECRET in production.
+jwt:
+  secret: ${JWT_SECRET:b1c3e5g7i9k1m3o5q7s9u1w3y5a7c9eb1c3e5g7i9k1m3o5q7s9u1w3y5a7c9e}
 
 #OSS. You have to use your own OSS account for file uploading
+#Credentials come from the OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET environment variables.
 aliyun:
   oss:
-    endpoint: https://oss-eu-west-1.aliyuncs.com
-    bucketName: comp208
-    region: eu-west-1
+    endpoint: ${OSS_ENDPOINT:https://oss-eu-west-1.aliyuncs.com}
+    bucketName: ${OSS_BUCKET:comp208}
+    region: ${OSS_REGION:eu-west-1}

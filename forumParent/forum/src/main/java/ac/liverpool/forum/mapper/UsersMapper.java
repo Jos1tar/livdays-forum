@@ -10,17 +10,11 @@ import java.util.Map;
 @Mapper
 public interface UsersMapper {
 
-    /**
-     * 根据用户名和密码查询员工信息
-     */
-    @Select("select * from users where username = #{username} and password = #{password}")
-    Users getUsernameAndPassword(Users emp);
-
     //根据id查询用户信息
     @Select("select * from users where id = #{id}")
     Users getUserById(Long id);
 
-    @Select("select * from posts where user_id = #{userId}")
+    @Select("select * from posts where user_id = #{userId} and is_deleted = 0 order by created_at desc")
     List<Posts> getPostsByUserId(Long userId);
 
     //根据id查询用户名称
@@ -33,9 +27,9 @@ public interface UsersMapper {
 
     // 新增注册相关方法
     @Insert("INSERT INTO users (username, password,  email, email_verified, " +
-            "verification_code, verification_code_expire_time, create_time, update_time) " +
+            "verification_code, verification_code_expire_time, created_at, is_deleted, create_time, update_time) " +
             "VALUES (#{username}, #{password},  #{email}, " +
-            "#{emailVerified}, #{verificationCode}, #{verificationCodeExpireTime}, #{createTime}, #{updateTime})")
+            "#{emailVerified}, #{verificationCode}, #{verificationCodeExpireTime}, #{createdAt}, 0, #{createTime}, #{updateTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Users user);
 
@@ -45,7 +39,8 @@ public interface UsersMapper {
     @Select("SELECT * FROM users WHERE username = #{username}")
     Users findByUsername(String username);
 
-    @Update("UPDATE users SET email_verified = true WHERE id = #{id}")
+    // marks the email as verified and clears the one-time code
+    @Update("UPDATE users SET email_verified = true, verification_code = NULL, verification_code_expire_time = NULL WHERE id = #{id}")
     int updateEmailVerified(Long id);
 
     @Update("UPDATE users SET verification_code = #{verificationCode}, verification_code_expire_time = #{verificationCodeExpireTime}, update_time = #{updateTime} WHERE email = #{email}")

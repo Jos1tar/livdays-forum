@@ -10,6 +10,8 @@ import java.util.Date;
 @NoArgsConstructor
 public class PostsVo {
     private Long id;
+    // author id, needed by the frontend to open a private chat with the author
+    private Long userId;
     private String title;
     private String content;
     private Date createdAt;

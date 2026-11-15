@@ -10,6 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 
+/**
+ * Private messages. The current user is always taken from the JWT (set by TokenInterceptor),
+ * never from request parameters, so nobody can read another user's messages.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/message")
@@ -18,13 +22,16 @@ public class MessageController {
     @Autowired
     private MessageService messageService;
 
+    private Long currentUserId(HttpServletRequest request) {
+        return (Long) request.getAttribute("userId");
+    }
+
     /**
      *send message
      */
     @PostMapping("/send")
     public Result sendMessage(HttpServletRequest request, @RequestBody MessageDTO messageDTO) {
-        // get userId from request attribute
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
@@ -35,12 +42,11 @@ public class MessageController {
      * get message list of the target user
      */
     @GetMapping("/list/{targetUserId}")
-    public Result getMessages(@RequestParam Long userId,
+    public Result getMessages(HttpServletRequest request,
                               @PathVariable Long targetUserId,
                               @RequestParam(required = false) Integer page,
                               @RequestParam(required = false) Integer pageSize) {
-
-
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
@@ -48,12 +54,11 @@ public class MessageController {
     }
 
     /**
-     * get conversation list of one user
+     * get conversation list of the current user
      */
     @GetMapping("/conversations")
-    public Result getConversations(@RequestParam Long userId) {
-
-
+    public Result getConversations(HttpServletRequest request) {
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
@@ -63,13 +68,13 @@ public class MessageController {
     /**
      * mark message as read
      */
-    @PutMapping("/read/{conversationId}/{userId}")
-    public Result markAsRead(@PathVariable Long conversationId,@PathVariable Long userId) {
-
+    @PutMapping("/read/{conversationId}")
+    public Result markAsRead(HttpServletRequest request, @PathVariable Long conversationId) {
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
-        return messageService.markAsRead(conversationId, userId);
+        return messageService.markAsRead(userId, conversationId);
     }
 
     /**
@@ -77,8 +82,7 @@ public class MessageController {
      */
     @GetMapping("/unread")
     public Result getUnreadCount(HttpServletRequest request) {
-
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
@@ -90,11 +94,10 @@ public class MessageController {
      */
     @DeleteMapping("/{conversationId}")
     public Result deleteConversation(HttpServletRequest request, @PathVariable Long conversationId) {
-
-        Long userId = (Long) request.getAttribute("userId");
+        Long userId = currentUserId(request);
         if (userId == null) {
             return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
         return messageService.deleteConversation(userId, conversationId);
     }
-} 
+}

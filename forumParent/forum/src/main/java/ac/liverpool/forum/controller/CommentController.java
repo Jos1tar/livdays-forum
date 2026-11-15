@@ -5,7 +5,9 @@ import ac.liverpool.forum.entity.dto.CommentQueryParam;
 import ac.liverpool.forum.entity.Comments;
 import ac.liverpool.forum.entity.VO.PageResult;
 import ac.liverpool.forum.entity.VO.Result;
+import ac.liverpool.forum.enums.AppHttpCodeEnum;
 import ac.liverpool.forum.service.CommentsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -45,7 +47,12 @@ public class CommentController {
      new comment
      */
     @PostMapping("/add")
-    public Result addComment(@RequestBody Comments comment) {
+    public Result addComment(HttpServletRequest request, @RequestBody Comments comment) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error(AppHttpCodeEnum.NEED_LOGIN);
+        }
+        comment.setUserId(userId); // the author is always the logged-in user
         log.info("new comment: {}", comment);
         commentsService.addComment(comment);
         return Result.success();

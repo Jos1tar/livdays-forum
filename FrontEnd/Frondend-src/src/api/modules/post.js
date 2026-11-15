@@ -37,17 +37,12 @@ export const usePostApi = () => {
   }
   
   // 点赞帖子
+  // 点赞人由后端从 token 里取，不需要传 userId
   const likePost = (data) => {
-    data.userId = JSON.parse(localStorage.getItem('userInfo')).id
-    data.targetId = data.postId
-    data.type = "post"
-
-    console.log(data)
     return request({
-      // url: `/posts/like`,
       url: `/like`,
       method: 'post',
-      data
+      data: { targetId: data.postId, type: 'post' }
     })
   }
   

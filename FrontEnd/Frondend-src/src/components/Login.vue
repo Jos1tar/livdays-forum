@@ -154,8 +154,8 @@ const loading = ref(false);
 const codeCooldown = ref(0);
 
 const loginForm = reactive({
-  username: '1',
-  password: '123456'
+  username: '',
+  password: ''
 });
 
 const signupForm = reactive({
@@ -291,8 +291,8 @@ const sendVerificationCode = async (type) => {
     ElMessage.success('Verification code sent to your email');
     startCooldown();
   } catch (error) {
+    // request.js 的拦截器已经弹出了后端返回的错误信息，这里不再重复提示
     console.error('Failed to send verification code:', error);
-    ElMessage.error(error.message || 'Failed to send verification code');
   }
 };
 
@@ -315,8 +315,8 @@ const handleLogin = async () => {
     ElMessage.success('Login successful');
     router.push('/home');
   } catch (error) {
+    // 错误提示（如 "Incorrect username or password"）由 request.js 拦截器统一弹出
     console.error('Login failed:', error);
-    ElMessage.error(error.msg || 'Login failed, please try again');
   } finally {
     loading.value = false;
   }
@@ -335,7 +335,7 @@ const handleSignup = async () => {
       password: signupForm.password,
       major: signupForm.major,
       email: signupForm.email,
-      confirmPassword:signupForm.password,
+      confirmPassword: signupForm.confirmPassword,
       verificationCode: signupForm.verificationCode
     };
     
@@ -352,8 +352,8 @@ const handleSignup = async () => {
     signupForm.email = '';
     signupForm.verificationCode = '';
   } catch (error) {
+    // 错误提示由 request.js 拦截器统一弹出
     console.error('Registration failed:', error);
-    ElMessage.error(error.message || 'Registration failed, please try again');
   } finally {
     loading.value = false;
   }

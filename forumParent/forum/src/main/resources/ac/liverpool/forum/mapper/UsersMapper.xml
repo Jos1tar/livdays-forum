@@ -20,7 +20,9 @@
             <if test="user.school != null">school = #{user.school},</if>
             <if test="user.major != null">major = #{user.major},</if>
             <if test="user.bio != null">bio = #{user.bio},</if>
-            <!-- 其他字段... -->
+            <if test="user.grade != null">grade = #{user.grade},</if>
+            <if test="user.studentId != null">student_id = #{user.studentId},</if>
+            <if test="user.updateTime != null">update_time = #{user.updateTime},</if>
         </set>
         WHERE id = #{user.id}
     </update>
@@ -30,7 +32,7 @@
         FROM users
         WHERE username = #{username}
         AND id != #{excludeUserId}
-        AND is_deleted = 0
+        AND IFNULL(is_deleted, 0) = 0
     </select>
 
     <select id="getAllActiveUsers" resultType="ac.liverpool.forum.entity.Users">

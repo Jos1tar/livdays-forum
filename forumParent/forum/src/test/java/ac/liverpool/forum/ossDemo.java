@@ -33,7 +33,7 @@ public class ossDemo {
                 .build();
 
         try {
-            File file = new File("C:\\Users\\Hongkun Jiang\\Desktop\\yuan.jpg");
+            File file = new File("path/to/your/image.jpg");
             byte[] content = Files.readAllBytes(file.toPath());
 
             ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(content));

@@ -6,6 +6,7 @@ import ac.liverpool.forum.entity.Posts;
 import ac.liverpool.forum.entity.VO.Result;
 import ac.liverpool.forum.entity.Users;
 import ac.liverpool.forum.enums.AppHttpCodeEnum;
+import ac.liverpool.forum.exception.BusinessException;
 import ac.liverpool.forum.mapper.UsersMapper;
 import ac.liverpool.forum.service.EmailService;
 import ac.liverpool.forum.service.TokenBlacklistService;
@@ -20,63 +21,82 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 
 @Slf4j
 @Service
 public class UsersServiceImpl implements UsersService {
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     @Autowired
     private UsersMapper usersMapper;
     @Autowired
     private TokenBlacklistService tokenBlacklistService;
-  @Autowired
+    @Autowired
     private EmailService emailService;
     @Autowired
     private PasswordEncoder passwordEncoder;
+
     @Override
     public LoginInfo login(Users emp) {
-        Users usersLogin = usersMapper.getUsernameAndPassword(emp);
-        if (usersLogin != null) {
-            // 1. generate JWT token
-            Map<String, Object> claims = new HashMap<>();
-            claims.put("username", usersLogin.getUsername()); // add additional claims
-
-            claims.put("id", usersLogin.getId());
-            String jwt = JwtUtils.generateJwt(usersLogin.getId(), claims); // Passing userId and additional claims
-
-            // 2. Return login information
-            return new LoginInfo(Math.toIntExact(usersLogin.getId()), usersLogin.getUsername(), jwt);
+        if (emp == null || !StringUtils.hasText(emp.getUsername()) || !StringUtils.hasText(emp.getPassword())) {
+            return null;
         }
-        return null;
+        Users usersLogin = usersMapper.findByUsername(emp.getUsername());
+        if (usersLogin == null || !passwordMatches(emp.getPassword(), usersLogin.getPassword())) {
+            return null;
+        }
+        // a record created by send-verification-code but never completed is not a real account
+        if (!Boolean.TRUE.equals(usersLogin.getEmailVerified()) && usersLogin.getVerificationCode() != null) {
+            return null;
+        }
+
+        // 1. generate JWT token
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", usersLogin.getUsername()); // add additional claims
+        claims.put("id", usersLogin.getId());
+        String jwt = JwtUtils.generateJwt(usersLogin.getId(), claims); // Passing userId and additional claims
+
+        // 2. Return login information
+        return new LoginInfo(Math.toIntExact(usersLogin.getId()), usersLogin.getUsername(), jwt);
     }
+
+    /**
+     * Passwords are stored as BCrypt hashes. Old demo rows in forumCopy.sql still hold plain text,
+     * so those are compared directly to keep the sample accounts usable.
+     */
+    private boolean passwordMatches(String raw, String stored) {
+        if (stored == null) {
+            return false;
+        }
+        if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
+            return passwordEncoder.matches(raw, stored);
+        }
+        return stored.equals(raw);
+    }
+
     @Override
     public Result logout(HttpServletRequest request) {
-        // Retrieve token from request header
-        String token = request.getHeader("token");
-
-        if(StringUtils.hasLength(token)) {
-            // Add the token to the blacklist
-            tokenBlacklistService.addToBlacklist(token);
+        String authHeader = request.getHeader("Authorization");
+        if (StringUtils.hasLength(authHeader) && authHeader.startsWith("Bearer ")) {
+            tokenBlacklistService.addToBlacklist(authHeader.substring(7));
             log.info("User logged out, token added to blacklist");
         }
-
         return Result.success("Logout successful");
     }
 
-    //Retrieve the current user ID and return it
     @Override
     public Result userInfo(Long userId) {
-        // Query user information based on userId
         Users user = usersMapper.getUserById(userId);
         if (user == null) {
-            return Result.error(AppHttpCodeEnum.valueOf("USER_NOT_EXIST"));
+            return Result.error(AppHttpCodeEnum.USER_NOT_EXIST);
         }
-
         return Result.success(user);
     }
 
@@ -94,72 +114,67 @@ public class UsersServiceImpl implements UsersService {
             return Result.error(AppHttpCodeEnum.USER_NOT_EXIST);
         }
 
-        // 3. Prepare to update data - only update fields that are allowed to be modified
-        Users updateUser = new Users();
-        updateUser.setId(user.getId());
+        // 3. Username must stay unique
+        if (StringUtils.hasText(user.getUsername()) && usersMapper.existsByUsername(user.getUsername(), user.getId())) {
+            return Result.error(AppHttpCodeEnum.USERNAME_EXIST);
+        }
 
-        //  Special handling of usernames - if a new username is provided, uniqueness needs to be checked
+        // 4. The profile endpoint must not change password / verification state
+        user.setPassword(null);
+        user.setEmailVerified(null);
+        user.setVerificationCode(null);
+        user.setVerificationCodeExpireTime(null);
+        user.setUpdateTime(LocalDateTime.now());
 
-            if (usersMapper.existsByUsername(user.getUsername(), user.getId())) {
-                return Result.error(AppHttpCodeEnum.USERNAME_EXIST);
-            }
-
-
-        // 4. All fields are allowed to be null
         int updated = usersMapper.updateUserInfo(user);
         if (updated <= 0) {
             return Result.error(AppHttpCodeEnum.SYSTEM_ERROR);
         }
-
         return Result.success("User information updated successfully");
     }
 
     @Override
     public Result getMyPosts(Long userId) {
+        // an empty list is a normal result, not an error
         List<Posts> posts = usersMapper.getPostsByUserId(userId);
-        if (posts == null || posts.isEmpty()) {
-            return Result.error(AppHttpCodeEnum.NO_POSTS);
-        }
         return Result.success(posts);
     }
 
     // Send verification code to email and create a temporary user record as part of the registration process
     @Override
     public void sendVerificationCode(String email) {
+        if (!StringUtils.hasText(email)) {
+            throw new BusinessException("Email cannot be empty");
+        }
 
         /*// Check if the email is a UK university email (ends with .ac.uk)
         if (!email.toLowerCase().endsWith(".ac.uk")) {
-            throw new RuntimeException("Only UK university email addresses (.ac.uk) are allowed");
+            throw new BusinessException("Only UK university email addresses (.ac.uk) are allowed");
         }*/
 
-        // Check if the email has been registered
-        Users existingUser = usersMapper.findByEmail(email);
-        if (existingUser != null) {
-            throw new RuntimeException("This email has already been registered");
+        // Generate a 6-digit random verification code
+        String verificationCode = String.format("%06d", RANDOM.nextInt(1000000));
+
+        Users user = usersMapper.findByEmail(email);
+        if (user != null && Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new BusinessException(AppHttpCodeEnum.EMAIL_EXIST, "This email has already been registered");
         }
 
-
-
-        // Generate a 6-digit random verification code
-        String verificationCode = String.format("%06d", new Random().nextInt(1000000));
-
-        //
-        Users user = usersMapper.findByEmail(email);
-
         if (user == null) {
-            // Create a new temporary user record
+            // Create a new temporary user record (no password until registration is completed)
             user = new Users();
             user.setUsername(email); // use email as username temporarily
-            user.setPassword(passwordEncoder.encode("tempPassword")); // temporary password
+            user.setPassword(null);
             user.setEmail(email);
             user.setVerificationCode(verificationCode);
             user.setVerificationCodeExpireTime(LocalDateTime.now().plusMinutes(5));
             user.setEmailVerified(false);
+            user.setCreatedAt(new Date());
             user.setCreateTime(LocalDateTime.now());
             user.setUpdateTime(LocalDateTime.now());
             usersMapper.insert(user);
         } else {
-            // update the existing user record with a new verification code
+            // registration was started before: just issue a new code
             user.setVerificationCode(verificationCode);
             user.setVerificationCodeExpireTime(LocalDateTime.now().plusMinutes(5));
             user.setUpdateTime(LocalDateTime.now());
@@ -173,37 +188,41 @@ public class UsersServiceImpl implements UsersService {
     @Override
     @Transactional
     public void register(UserRegisterDTO registerDTO) {
-        // Verify if the username already exists
-        if (usersMapper.findByUsername(registerDTO.getUsername()) != null) {
-            throw new RuntimeException("Username already exists");
+        if (!registerDTO.getPassword().equals(registerDTO.getConfirmPassword())) {
+            throw new BusinessException("Passwords do not match");
         }
-
 
         // Verify email verification code
-
         Users user = usersMapper.findByEmail(registerDTO.getEmail());
-
-        if (user == null) {
-            throw new RuntimeException("Please send the verification code first");
+        if (user == null || user.getVerificationCode() == null) {
+            throw new BusinessException("Please send the verification code first");
         }
-        if ( !user.getVerificationCode().equals(registerDTO.getVerificationCode())) {
-            throw new RuntimeException("Verification code is incorrect");
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new BusinessException(AppHttpCodeEnum.EMAIL_EXIST, "This email has already been registered");
+        }
+        if (!user.getVerificationCode().equals(registerDTO.getVerificationCode())) {
+            throw new BusinessException("Verification code is incorrect");
+        }
+        if (user.getVerificationCodeExpireTime() == null
+                || user.getVerificationCodeExpireTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("Verification code has expired");
         }
 
-        if (user.getVerificationCodeExpireTime().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Verification code has expired");
+        // Verify the username is not taken by another account (the temp record itself uses the email as username)
+        Users sameName = usersMapper.findByUsername(registerDTO.getUsername());
+        if (sameName != null && !sameName.getId().equals(user.getId())) {
+            throw new BusinessException(AppHttpCodeEnum.USERNAME_EXIST, "Username already exists");
         }
 
         // Update user information
         user.setUsername(registerDTO.getUsername());
-        user.setPassword(registerDTO.getPassword());
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));
         user.setEmail(registerDTO.getEmail());
-        user.setEmailVerified(true);
+        user.setMajor(registerDTO.getMajor());
         user.setUpdateTime(LocalDateTime.now());
 
-
-        usersMapper.updateEmailVerified(user.getId());
         usersMapper.updateUserInfo(user);
+        usersMapper.updateEmailVerified(user.getId());
     }
 
 }

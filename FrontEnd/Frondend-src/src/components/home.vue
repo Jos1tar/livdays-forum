@@ -362,7 +362,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   usePostApi,
   useCommentApi,
@@ -465,18 +465,19 @@ const confirmLogout = () => {
 // 执行退出登录
 const logout = async () => {
   try {
-    // 调用退出登录接口
+    // 调用退出登录接口（把 token 拉黑）
     await userApi.logout();
-    // 清除本地存储
-    localStorage.removeItem('token');
-    localStorage.removeItem('userInfo');
-    currentUser.value = null;
-    userPosts.value = [];
-    // 跳转到登录页面
-    window.location.href = '/';
   } catch (err) {
+    // token 已过期等情况下接口会失败，但本地仍然要退出
     console.error("Logout failed:", err);
   }
+  // 清除本地存储
+  localStorage.removeItem('token');
+  localStorage.removeItem('userInfo');
+  currentUser.value = null;
+  userPosts.value = [];
+  // 跳转到登录页面
+  window.location.href = '/';
 };
 
 // 获取用户信息
@@ -646,8 +647,9 @@ const likePost = async (postId) => {
     if (showPostDetail.value && currentPost.value.id === postId) {
       console.log("112233")
       const postResponse = await postApi.getPostDetail(postId);
-      console.log("postResponse",postResponse.data)
-      currentPost.value = postResponse.data;
+      // 详情接口里的 comments 是"评论数"（数字），保留已经加载好的评论列表
+      const loadedComments = currentPost.value.comments;
+      currentPost.value = { ...postResponse.data, comments: loadedComments };
     } else {
       // 否则更新列表
       await fetchPosts();
@@ -700,8 +702,8 @@ const fetchPopularPosts = async () => {
     loading.value = true;
     error.value = null;
     
-    // 使用与首页相同的帖子列表，只是排序方式不同
-    const response = await postApi.getPostList();
+    // 按点赞数排序（后端 orderByLikes 参数）
+    const response = await postApi.getPostList({ orderByLikes: true });
     posts.value = response.data.rows;
     
     loading.value = false;
@@ -769,8 +771,7 @@ const clearSearch = () => {
 
 // 时间格式化函数
 const formatTime = (timestamp) => {
-  console.log("timestamp",timestamp)
-  if (!timestamp) return 
+  if (!timestamp) return ''
   
   const date = new Date(timestamp);
   const now = new Date();
@@ -826,12 +827,14 @@ const saveUserProfile = async () => {
     
     await userApi.updateUserInfo(editForm.value);
     
-    // 更新本地用户信息
+    // 更新本地用户信息（同时写回 localStorage，刷新页面后不会丢）
     userInfo.value = {
       ...userInfo.value,
       ...editForm.value
     };
-    
+    currentUser.value = userInfo.value;
+    localStorage.setItem('userInfo', JSON.stringify(userInfo.value));
+
     showEditProfile.value = false;
     loading.value = false;
   } catch (err) {
@@ -841,8 +844,18 @@ const saveUserProfile = async () => {
 };
 
 // 打开聊天室
-const openChat = async (user) => {
-  currentChatUser.value = user;
+// 传进来的是帖子或评论对象：聊天对象是它的作者（userId），而不是帖子/评论自己的 id
+const openChat = async (item) => {
+  const targetId = item?.userId;
+  if (!targetId) {
+    ElMessage.warning('Cannot find the author of this item');
+    return;
+  }
+  if (userInfo.value && targetId === userInfo.value.id) {
+    ElMessage.info('This is you :)');
+    return;
+  }
+  currentChatUser.value = { id: targetId, username: item.username || `user ${targetId}` };
   showChat.value = true;
   await fetchChatMessages();
   // 等待DOM更新后滚动到底部
@@ -858,7 +871,6 @@ const fetchChatMessages = async () => {
     const response = await chatApiInstance.messageList({
       page: 1,
       pageSize: 999,
-      userId: userInfo.value.id,
       targetUserId: currentChatUser.value.id
     });
     // 反转消息列表，使最新的消息在底部
@@ -915,13 +927,11 @@ const filteredPosts = computed(() => {
 const sortedPosts = computed(() => {
   const postsToSort = [...posts.value];
   
-  // 根据时间排序
+  // 热门：点赞多的在前，点赞相同则最新的在前
   postsToSort.sort((a, b) => {
-    const timeA = new Date(a.createdAt).getTime();
-    const timeB = new Date(b.createdAt).getTime();
-    
-    // 热门页面默认按时间降序（最新在前）
-    return sortOrder.value ? timeA - timeB : timeB - timeA;
+    const likeDiff = (b.likes || 0) - (a.likes || 0);
+    if (likeDiff !== 0) return likeDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
   
   return postsToSort;

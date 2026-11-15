@@ -9,6 +9,7 @@ import ac.liverpool.forum.entity.VO.PageResult;
 import ac.liverpool.forum.entity.VO.Result;
 import ac.liverpool.forum.enums.AppHttpCodeEnum;
 import ac.liverpool.forum.service.PostsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -42,18 +43,16 @@ public class PostsController  {
         return Result.success(posts);
     }
 
-    //create a new post
+    //create a new post - the author is always the logged-in user
     @PostMapping
-    public Result createPost( @RequestBody PostCreateRequest request) {
-        try {
-            Posts post = postsService.createPost(request);
-            return Result.success(post);
-        } catch (Exception e) {
-            return Result.error(AppHttpCodeEnum.SYSTEM_ERROR);
+    public Result createPost(HttpServletRequest httpRequest, @RequestBody PostCreateRequest request) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        if (userId == null) {
+            return Result.error(AppHttpCodeEnum.NEED_LOGIN);
         }
+        request.setUserId(userId);
+        Posts post = postsService.createPost(request);
+        return Result.success(post);
     }
 
-
-
 }
-

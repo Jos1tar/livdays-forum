@@ -43,13 +43,14 @@
         WHERE id = #{id} AND is_deleted = 0
     </select>
 
+    <!-- Deliberately also returns soft-deleted rows: (user1_id, user2_id) is UNIQUE,
+         so a deleted conversation has to be revived instead of inserting a new one. -->
     <select id="findConversation" resultMap="conversationMap">
         SELECT * FROM conversation
-        WHERE 
+        WHERE
             ((user1_id = #{userId1} AND user2_id = #{userId2})
-            OR 
+            OR
             (user1_id = #{userId2} AND user2_id = #{userId1}))
-            AND is_deleted = 0
         LIMIT 1
     </select>
 
@@ -62,14 +63,14 @@
     </select>
 
     <select id="getUnreadCount" resultType="int">
-        SELECT 
-            SUM(
+        SELECT
+            COALESCE(SUM(
                 CASE 
                     WHEN user1_id = #{userId} THEN unread_count_user1
                     WHEN user2_id = #{userId} THEN unread_count_user2
                     ELSE 0
                 END
-            ) AS total_unread
+            ), 0) AS total_unread
         FROM conversation
         WHERE 
             (user1_id = #{userId} OR user2_id = #{userId})

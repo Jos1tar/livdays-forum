@@ -3,7 +3,8 @@ package ac.liverpool.forum.entity;
 import java.time.LocalDateTime;
 import java.util.Date;
 
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,6 +28,8 @@ public class Users  {
 
     private String username;
 
+    // accepted in request bodies (login) but never written to responses
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     private String nickname ;
@@ -50,7 +53,9 @@ public class Users  {
     private String studentId;
     private String grade;
     private Boolean emailVerified;
+    @JsonIgnore
     private String verificationCode;
+    @JsonIgnore
     private LocalDateTime verificationCodeExpireTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

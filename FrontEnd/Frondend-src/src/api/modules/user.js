@@ -37,8 +37,10 @@ export const useUserApi = () => {
   }
   const getVerification = (data) => {
     return request({
-      url: `/user/send-verification-code?email=${data.email}`,
+      url: '/user/send-verification-code',
       method: 'post',
+      // 用 params 让 axios 做 URL 编码（邮箱里的 + 号等字符直接拼接会出错）
+      params: { email: data.email }
     })
   }
   

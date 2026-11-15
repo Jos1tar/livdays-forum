@@ -2,18 +2,19 @@
 import request from '@/utils/request'
 
 export const useUploadApi = () => {
-  // 获取帖子详情
-  const useUploadApi = (data) => {
+  // 上传文件，参数是 File 对象（例如 <input type="file"> 拿到的），返回 OSS 上的图片 URL
+  const uploadFile = (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
     return request({
       url: '/upload',
       method: 'post',
-      data
+      data: formData
     })
   }
-  
 
-  
   return {
-    useUploadApi
+    uploadFile,
+    useUploadApi: uploadFile // 旧名字，保留兼容
   }
 }

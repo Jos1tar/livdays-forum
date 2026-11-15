@@ -20,10 +20,14 @@ public class UserRegisterDTO {
 
 
     @NotBlank(message = "Email cannot be empty")
+    // also allows dots in the local part, e.g. first.last@liverpool.ac.uk
     @Email(message = "Email format incorrect")
-    @Pattern(regexp = "^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)+$", message = "Email format incorrect")
+    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)+$", message = "Email format incorrect")
     private String email;
 
     @NotBlank(message = "The verification code cannot be empty")
     private String verificationCode;
+
+    // optional, sent by the sign-up form
+    private String major;
 } 
